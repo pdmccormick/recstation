@@ -74,6 +74,10 @@ func RunMain() {
 		cfg.Groups = append(cfg.Groups, group)
 	}
 
+	if err := SendPeriodicIgmpMembershipReports(cfg.Iface, cfg.Groups); err != nil {
+		panic(err)
+	}
+
 	for _, group := range cfg.Groups {
 		if err := cfg.V4Conn.JoinGroup(cfg.Iface, &net.UDPAddr{IP: group}); err != nil {
 			panic(err)
