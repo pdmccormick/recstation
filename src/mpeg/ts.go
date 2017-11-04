@@ -4,8 +4,9 @@ const (
 	MAX_PIDS = 8192
 	MAX_CC   = 16
 
-	TS_PACKET_LENGTH = 188
-	TS_MAGIC_BYTE    = 'G'
+	TS_PACKET_LENGTH      = 188
+	TS_MAGIC_BYTE         = 'G'
+	TS_MAX_PAYLOAD_LENGTH = 184
 
 	TEI_OFFSET                      = 1
 	TEI_MASK                        = 0x80
@@ -28,6 +29,7 @@ const (
 
 	ADAPTATION_PAYLOAD_PRESENT_MASK = 0x1
 	ADAPTATION_FIELD_PRESENT_MASK   = 0x2
+	ADAPTATION_FIELD_LENGTH         = 4
 	MAX_ADAPTATION_FIELD_LENGTH     = 183
 )
 
@@ -36,6 +38,7 @@ type TsFrame [TS_PACKET_LENGTH]byte
 type TsBuffer []byte
 
 type PID uint16
+type AFC uint8
 type CC uint8
 
 func (buf TsBuffer) ToFrame(frame *TsFrame) bool {
@@ -131,6 +134,20 @@ func (buf TsBuffer) SetPid(pid PID) {
 	buf[PID_OFFSET+1] = b1
 }
 
+func (buf TsBuffer) GetAfc() AFC {
+	b := buf[ADAPTATION_CONTROL_FIELD_OFFSET]
+
+	return AFC((b & ADAPTATION_CONTROL_FIELD_MASK) >> ADAPTATION_CONTROL_FIELD_SHIFT)
+}
+
+func (buf TsBuffer) SetAfc(afc AFC) {
+	b := buf[ADAPTATION_CONTROL_FIELD_OFFSET]
+
+	b = (b &^ ADAPTATION_CONTROL_FIELD_MASK) | byte((afc<<ADAPTATION_CONTROL_FIELD_SHIFT)&ADAPTATION_CONTROL_FIELD_MASK)
+
+	buf[ADAPTATION_CONTROL_FIELD_OFFSET] = b
+}
+
 func (buf TsBuffer) GetCc() CC {
 	b := buf[CC_OFFSET]
 
@@ -143,4 +160,25 @@ func (buf TsBuffer) SetCc(cc CC) {
 	b = (b &^ CC_MASK) | byte(cc)
 
 	buf[CC_OFFSET] = b
+}
+
+func (buf TsBuffer) GetPayload() []byte {
+	offs := TS_PACKET_LENGTH
+
+	afc := buf.GetAfc()
+	if (afc & ADAPTATION_PAYLOAD_PRESENT_MASK) != 0 {
+		offs = 4
+
+		if (afc & ADAPTATION_FIELD_PRESENT_MASK) != 0 {
+			af_len := buf[ADAPTATION_FIELD_LENGTH]
+
+			if af_len > MAX_ADAPTATION_FIELD_LENGTH {
+				offs = TS_PACKET_LENGTH
+			} else {
+				offs += 1 + int(af_len)
+			}
+		}
+	}
+
+	return buf[offs:TS_PACKET_LENGTH]
 }

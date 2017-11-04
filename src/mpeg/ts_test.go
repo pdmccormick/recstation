@@ -147,6 +147,24 @@ func Test_Ts_CcRoundtrip(t *testing.T) {
 				return
 			}
 		}
+	}
+}
 
+func Test_Ts_Payload(t *testing.T) {
+	pkts := []*TsFrame{
+		&PID_0_PAT,
+		&PID_4096_PMT,
+	}
+
+	for _, pkt := range pkts {
+		var frm = TsFrame(*pkt)
+		buf := frm.ToBuffer()
+
+		payload := buf.GetPayload()
+
+		if len(payload) != TS_MAX_PAYLOAD_LENGTH {
+			t.Errorf("Got payload length %d, expected %d", len(payload), TS_MAX_PAYLOAD_LENGTH)
+			return
+		}
 	}
 }
