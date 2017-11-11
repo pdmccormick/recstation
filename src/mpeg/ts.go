@@ -46,7 +46,7 @@ func (buf TsBuffer) ToFrame(frame *TsFrame) bool {
 		return false
 	}
 
-	copy(buf[0:TS_PACKET_LENGTH], frame[0:TS_PACKET_LENGTH])
+	copy(frame[0:TS_PACKET_LENGTH], buf[0:TS_PACKET_LENGTH])
 
 	return true
 }

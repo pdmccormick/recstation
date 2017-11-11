@@ -40,68 +40,117 @@ func Usage() {
 
 func RunMain() {
 	flag.Usage = Usage
-	iface := flag.String("iface", "", "Interface name")
+	ifaceName := flag.String("iface", "", "Interface name")
 
 	flag.Parse()
 
-	if iface == nil {
+	if ifaceName == nil {
 		Usage()
 		os.Exit(1)
 	}
 
-	cfg := Config{
-		IfName:     *iface,
-		ListenAddr: "0.0.0.0:6000",
-	}
-
-	var err error
-
-	cfg.Iface, err = net.InterfaceByName(cfg.IfName)
+	iface, err := net.InterfaceByName(*ifaceName)
 	if err != nil {
 		panic(err)
 	}
 
-	cfg.Conn, err = net.ListenPacket("udp4", cfg.ListenAddr)
+	source, err := MakeUdpSource(iface, "0.0.0.0:5004")
 	if err != nil {
 		panic(err)
 	}
-	defer cfg.Conn.Close()
 
-	cfg.V4Conn = ipv4.NewPacketConn(cfg.Conn)
+	var groupAddrs []net.IP
 
 	for _, groupAddr := range groups {
 		group := net.ParseIP(groupAddr)
-		cfg.Groups = append(cfg.Groups, group)
+		groupAddrs = append(groupAddrs, group)
 	}
 
-	if err := SendPeriodicIgmpMembershipReports(cfg.Iface, cfg.Groups); err != nil {
+	if err := SendPeriodicIgmpMembershipReports(iface, groupAddrs); err != nil {
 		panic(err)
 	}
 
-	for _, group := range cfg.Groups {
-		if err := cfg.V4Conn.JoinGroup(cfg.Iface, &net.UDPAddr{IP: group}); err != nil {
+	conn, err := net.ListenPacket("udp4", "0.0.0.0:6000")
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	v4Conn := ipv4.NewPacketConn(conn)
+
+	for _, group := range groupAddrs {
+		if err := v4Conn.JoinGroup(iface, &net.UDPAddr{IP: group}); err != nil {
 			panic(err)
 		}
 	}
 
-	if err := cfg.V4Conn.SetControlMessage(ipv4.FlagDst, true); err != nil {
+	if err := v4Conn.SetControlMessage(ipv4.FlagDst, true); err != nil {
 		panic(err)
 	}
 
 	events := make(chan HeartbeatEvent)
 
 	timeout := 3 * time.Second
-	go RunHeartbeat(cfg.V4Conn, timeout, events)
+	_ = timeout
+	go RunHeartbeat(v4Conn, timeout, events)
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
+	MakeFilenameMaker := func(stream string) func() string {
+		return func() string {
+			now := time.Now()
+			f := now.Format("20060102_150405.00000-0700")
+
+			return fmt.Sprintf("%s-%s-%s.ts", hostname, stream, f)
+		}
+	}
+
+	type MySink struct {
+		Sink  *Sink
+		Namer func() string
+	}
+
+	sinks := make(map[string]*MySink)
+
+	const REOPEN_TIME = 1 * time.Minute
+	reopen_tick := time.NewTicker(REOPEN_TIME)
 
 	for {
-		ev := <-events
+		select {
+		case ev := <-events:
+			switch ev.Event {
+			case HEARTBEAT_ONLINE:
+				log.Printf("Online %s => %s", ev.Src, ev.Dst)
 
-		switch ev.Event {
-		case HEARTBEAT_ONLINE:
-			log.Printf("Online %s => %s", ev.Src, ev.Dst)
+				key := ev.Dst.String()
 
-		case HEARTBEAT_OFFLINE:
-			log.Printf("OFFLINE %s => %s", ev.Src, ev.Dst)
+				sink := MakeSink()
+
+				mysink := &MySink{
+					Sink:  sink,
+					Namer: MakeFilenameMaker(key),
+				}
+
+				sink.OpenFile <- mysink.Namer
+				source.AddSink(ev.Dst, sink)
+
+				sinks[key] = mysink
+
+			case HEARTBEAT_OFFLINE:
+				log.Printf("OFFLINE %s => %s", ev.Src, ev.Dst)
+				source.leaveGroup <- ev.Dst
+
+				delete(sinks, ev.Dst.String())
+			}
+
+		case <-reopen_tick.C:
+			for _, mysink := range sinks {
+				mysink.Sink.OpenFile <- mysink.Namer
+			}
 		}
+
 	}
 }
