@@ -62,7 +62,6 @@ func (source *UdpSource) AddSink(group net.IP, sink *Sink) {
 }
 
 func MakeUdpSource(iface *net.Interface, listenAddr string) (*UdpSource, error) {
-
 	source := &UdpSource{
 		Iface:        iface,
 		ListenError:  make(chan error),
@@ -90,8 +89,6 @@ func MakeUdpSource(iface *net.Interface, listenAddr string) (*UdpSource, error) 
 	if err := source.PktConn.SetControlMessage(ipv4.FlagDst, true); err != nil {
 		return nil, err
 	}
-
-	//nrecvs := NUM_INFLIGHT_PACKETS
 
 	for i := 0; i < NUM_INFLIGHT_PACKETS; i++ {
 		source.RxBufReady <- &RecvBuf{
@@ -158,113 +155,6 @@ func (source *UdpSource) RunLoop() {
 		}
 	}
 }
-
-/*
-	cfg.Iface, err = net.InterfaceByName(cfg.IfName)
-	if err != nil {
-		panic(err)
-	}
-
-	cfg.Conn, err = net.ListenPacket("udp4", cfg.ListenAddr)
-	if err != nil {
-		panic(err)
-	}
-	defer cfg.Conn.Close()
-
-	cfg.V4Conn = ipv4.NewPacketConn(cfg.Conn)
-
-	for _, groupAddr := range groups {
-		group := net.ParseIP(groupAddr)
-		cfg.Groups = append(cfg.Groups, group)
-	}
-
-	if err := SendPeriodicIgmpMembershipReports(cfg.Iface, cfg.Groups); err != nil {
-		panic(err)
-	}
-
-	for _, group := range cfg.Groups {
-		if err := cfg.V4Conn.JoinGroup(cfg.Iface, &net.UDPAddr{IP: group}); err != nil {
-			panic(err)
-		}
-	}
-
-*/
-
-/*
-func (source *UdpSource) ListenLoop() {
-	nrecvs := 2048
-	eachbuflen := 2048
-	masterbuf := make([]byte, nrecvs*eachbuflen)
-	npkts := 10
-
-	recvs := make([]*RecvPacket, nrecvs)
-	offs := 0
-
-	for i := 0; i < nrecvs; i++ {
-		recvs[i] = &RecvBuf{
-			Buf:  masterbuf[offs : offs+eachbuflen],
-			Pkts: make([]mpeg.TsBuffer, 0, npkts),
-		}
-
-		offs += eachbuflen
-	}
-
-	oob := make([]byte, 1024)
-
-	for i := 0; ; i = (i + 1) % nrecvs {
-		recv := recvs[i]
-
-		var n, oobn, flags int
-		var src *net.UDPAddr
-
-		for {
-			var err error
-			n, oobn, flags, src, err = source.UdpConn.ReadMsgUDP(recv.Buf, oob)
-
-			if err != nil {
-				panic(err)
-				source.ListenError <- err
-				continue
-			}
-
-			if n == 0 {
-				continue
-			}
-
-			break
-		}
-
-		if flags != 0 || oobn != 0 || oob[0] != 0 {
-		}
-
-		recv.Pkts = recv.Pkts[:0]
-
-		for offs := 0; offs < n; offs += mpeg.TS_PACKET_LENGTH {
-			pkt := mpeg.TsBuffer(recv.Buf[offs:(offs + mpeg.TS_PACKET_LENGTH)])
-
-			if pkt.IsValid() && pkt.GetPid() != mpeg.PID_PADDING {
-				recv.Pkts = append(recv.Pkts, pkt)
-			}
-		}
-
-		if len(recv.Pkts) == 0 {
-			continue
-		}
-
-		var cm ipv4.ControlMessage
-		err := cm.Parse(oob[:oobn])
-		if err != nil {
-			panic(err)
-			continue
-		}
-
-		recv.Src = src.IP.To4()
-		recv.Dst = cm.Dst.To4()
-
-		source.RecvPackets <- recv
-	}
-}
-*/
 
 func (_ *UdpSource) RecvLoop(conn *net.UDPConn, source chan *RecvBuf, sink chan *RecvBuf) {
 	for {

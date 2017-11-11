@@ -1,0 +1,22 @@
+{
+    "iface": "eth0",
+
+    "output_filename": "/video/pyconca/{{year}}/{{year}}-{{month}}-{{day}}/{{hostname}}/{{hostname}},{{stream}},{{timestamp}},{{start}}.ts",
+    "output_timestamp": "2006-01-02,150405.000000-0700",
+    "new_output_every": "1m",
+
+    "source_listen": "0.0.0.0:5004",
+    "heartbeat_listen": "0.0.0.0:6000",
+    "heartbeat_timeout": "3s",
+
+    "multicasts": {
+        "239.255.42.42": "vancouver",
+        "239.255.43.43": "toronto",
+        "239.255.44.44": "calgary",
+        "239.255.45.45": "montreal",
+        "239.255.46.46": "saskatoon",
+        "239.255.47.47": "halifax",
+        "239.255.48.48": "winnipeg",
+        "239.255.49.49": "stjohns"
+    }
+}

@@ -3,6 +3,7 @@ package recstation
 import (
 	"log"
 	"os"
+	"path"
 
 	"mpeg"
 
@@ -17,19 +18,32 @@ type Sink struct {
 	File *os.File
 
 	Stop     chan bool
-	OpenFile chan func() string
+	OpenFile chan func(start bool) string
 	Packets  chan []mpeg.TsBuffer
 }
 
 func MakeSink() *Sink {
 	sink := &Sink{
-		OpenFile: make(chan func() string),
+		OpenFile: make(chan func(start bool) string),
 		Packets:  make(chan []mpeg.TsBuffer),
 	}
 
 	go sink.Runloop()
 
 	return sink
+}
+
+func ensureExists(path string) error {
+	_, err := os.Stat(path)
+	if err == nil {
+		return nil
+	}
+
+	if os.IsNotExist(err) {
+		return os.MkdirAll(path, os.ModePerm)
+	}
+
+	return nil
 }
 
 func (sink *Sink) Runloop() {
@@ -42,15 +56,24 @@ func (sink *Sink) Runloop() {
 			running = false
 
 		case makeFilename := <-sink.OpenFile:
+			start := true
+
 			if sink.File != nil {
 				sink.File.Close()
 				sink.File = nil
+				start = false
 			}
 
-			filename := makeFilename()
-			log.Print("Opening ", filename)
+			filename := makeFilename(start)
+			log.Printf("Opening %s (start %v)", filename, start)
 
 			if filename != "" {
+				dirname := path.Dir(filename)
+				if err := ensureExists(dirname); err != nil {
+					log.Printf("Unable to create directory %s: %s", dirname, err)
+					continue
+				}
+
 				f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 				if err != nil {
 					panic(err)

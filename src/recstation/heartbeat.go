@@ -8,6 +8,13 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
+type Heartbeat struct {
+	Conn    net.PacketConn
+	V4Conn  *ipv4.PacketConn
+	Events  chan HeartbeatEvent
+	Timeout time.Duration
+}
+
 const (
 	HEARTBEAT_ONLINE = iota
 	HEARTBEAT_OFFLINE
@@ -139,4 +146,34 @@ func RunHeartbeat(conn *ipv4.PacketConn, timeout time.Duration, events chan<- He
 			}
 		}
 	}
+}
+
+func MakeHeartbeat(iface *net.Interface, listenAddr string, timeout time.Duration, groupAddrs []net.IP) (*Heartbeat, error) {
+	conn, err := net.ListenPacket("udp4", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	v4conn := ipv4.NewPacketConn(conn)
+
+	for _, group := range groupAddrs {
+		if err := v4conn.JoinGroup(iface, &net.UDPAddr{IP: group}); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := v4conn.SetControlMessage(ipv4.FlagDst, true); err != nil {
+		return nil, err
+	}
+
+	heartbeat := &Heartbeat{
+		Conn:    conn,
+		V4Conn:  v4conn,
+		Events:  make(chan HeartbeatEvent),
+		Timeout: timeout,
+	}
+
+	go RunHeartbeat(heartbeat.V4Conn, heartbeat.Timeout, heartbeat.Events)
+
+	return heartbeat, nil
 }
