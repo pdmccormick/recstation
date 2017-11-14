@@ -11,21 +11,31 @@ import (
 )
 
 type Sink struct {
+	Name    string
+	Running bool
+
 	pat     mpeg.TsFrame
 	pmt     mpeg.TsFrame
 	pmt_pid mpeg.PID
 
-	File *os.File
+	File     *os.File
+	Filename string
+	Namer    func(start bool) string
 
-	Stop     chan bool
-	OpenFile chan func(start bool) string
-	Packets  chan []mpeg.TsBuffer
+	StopRequest     chan bool
+	OfflineRequest  chan bool
+	OpenFileRequest chan bool
+	Packets         chan []mpeg.TsBuffer
 }
 
-func MakeSink() *Sink {
+func MakeSink(name string, namer func(start bool) string) *Sink {
 	sink := &Sink{
-		OpenFile: make(chan func(start bool) string),
-		Packets:  make(chan []mpeg.TsBuffer),
+		Name:            name,
+		Namer:           namer,
+		StopRequest:     make(chan bool),
+		OfflineRequest:  make(chan bool),
+		OpenFileRequest: make(chan bool),
+		Packets:         make(chan []mpeg.TsBuffer),
 	}
 
 	go sink.Runloop()
@@ -46,43 +56,82 @@ func ensureExists(path string) error {
 	return nil
 }
 
+func (sink *Sink) closeFile() bool {
+	if sink.File == nil {
+		return false
+	}
+
+	log.Printf("Closing %s file %s", sink.Name, sink.Filename)
+
+	sink.File.Close()
+	sink.File = nil
+	sink.Filename = ""
+
+	return true
+}
+
+func (sink *Sink) openFile(filename string) (bool, error) {
+	if sink.File != nil || filename == "" {
+		return false, nil
+	}
+
+	log.Printf("Opening %s", filename)
+
+	dirname := path.Dir(filename)
+	if err := ensureExists(dirname); err != nil {
+		log.Printf("Unable to create directory %s: %s", dirname, err)
+		return false, err
+	}
+
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		log.Print("Unable to open: ", err)
+		return false, err
+	}
+
+	sink.File = f
+	sink.Filename = filename
+
+	return true, nil
+}
+
 func (sink *Sink) Runloop() {
-	running := true
+	online := true
 	multiple := make([][]byte, 10)
 
-	for running {
+	for online {
 		select {
-		case <-sink.Stop:
-			running = false
+		case <-sink.StopRequest:
+			sink.closeFile()
 
-		case makeFilename := <-sink.OpenFile:
-			start := true
+			sink.Running = false
 
-			if sink.File != nil {
-				sink.File.Close()
-				sink.File = nil
-				start = false
+		case <-sink.OfflineRequest:
+			log.Printf("Sink '%s' going offline", sink.Name)
+
+			sink.closeFile()
+
+			sink.Running = false
+
+			online = false
+
+		case <-sink.OpenFileRequest:
+			start := !sink.closeFile()
+
+			filename := sink.Namer(start)
+
+			ok, err := sink.openFile(filename)
+			if err != nil {
+				panic(err)
 			}
 
-			filename := makeFilename(start)
-			log.Printf("Opening %s (start %v)", filename, start)
-
-			if filename != "" {
-				dirname := path.Dir(filename)
-				if err := ensureExists(dirname); err != nil {
-					log.Printf("Unable to create directory %s: %s", dirname, err)
-					continue
-				}
-
-				f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-				if err != nil {
-					panic(err)
-				}
-
-				sink.File = f
-			}
+			sink.Running = ok
 
 		case pkts := <-sink.Packets:
+			if !sink.Running {
+				continue
+			}
+
 			npkts := len(pkts)
 			nbytes := 0
 			for i, pkt := range pkts {

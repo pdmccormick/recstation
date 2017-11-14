@@ -21,6 +21,18 @@ type State struct {
 	GroupAddrs       []net.IP
 	Groups           []*Group
 	ListenAddr       string
+	StatusRequest    chan chan *StatusMessage
+	RecordRequest    chan chan bool
+	StopRequest      chan chan bool
+	Recording        bool
+	RecordingStart   time.Time
+}
+
+type StatusMessage struct {
+	Hostname          string   `json:"hostname"`
+	Recording         bool     `json:"recording"`
+	RecordingDuration float64  `json:"recording_duration"`
+	Sinks             []string `json:"sinks"`
 }
 
 func MakeState(cfg ConfigJson) (*State, error) {
@@ -50,6 +62,9 @@ func MakeState(cfg ConfigJson) (*State, error) {
 		Iface:            iface,
 		NewOutputEvery:   new_output_every,
 		HeartbeatTimeout: heartbeat_timeout,
+		StatusRequest:    make(chan chan *StatusMessage),
+		RecordRequest:    make(chan chan bool),
+		StopRequest:      make(chan chan bool),
 	}
 
 	for multicast, name := range state.Multicast2Name {

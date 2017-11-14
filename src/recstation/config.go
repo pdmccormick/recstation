@@ -15,6 +15,7 @@ type ConfigJson struct {
 	SourceListen        string            `json:"source_listen"`
 	HeartbeatListen     string            `json:"heartbeat_listen"`
 	HeartbeatTimeoutDur string            `json:"heartbeat_timeout"`
+	HttpListen          string            `json:"http_listen"`
 }
 
 func (cfg *ConfigJson) DecodeJson(r io.Reader) error {

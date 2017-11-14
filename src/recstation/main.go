@@ -41,6 +41,7 @@ func MakeFilenameMaker(state *State, stream string) func(bool) string {
 func RunMain() {
 	flag.Usage = Usage
 	configFilename := flag.String("config", "", "Config filename")
+	httpListen := flag.String("addr", ":8080", "HTTP service address")
 
 	flag.Parse()
 
@@ -61,6 +62,14 @@ func RunMain() {
 		panic(err)
 	}
 
+	if cfg.HttpListen != "" {
+		httpListen = &cfg.HttpListen
+	}
+
+	if err := StartWeb(state, *httpListen); err != nil {
+		panic(err)
+	}
+
 	source, err := MakeUdpSource(state.Iface, state.SourceListen)
 	if err != nil {
 		panic(err)
@@ -75,17 +84,65 @@ func RunMain() {
 		panic(err)
 	}
 
-	type MySink struct {
-		Sink  *Sink
-		Namer func(start bool) string
-	}
-
-	sinks := make(map[string]*MySink)
+	sinks := make(map[string]*Sink)
 
 	new_output_tick := time.NewTicker(state.NewOutputEvery)
+	new_output_tick.Stop()
 
 	for {
 		select {
+		case resp := <-state.RecordRequest:
+			if state.Recording {
+				// Already recording
+				resp <- false
+			} else {
+				// Begin recording
+				state.Recording = true
+				state.RecordingStart = time.Now()
+
+				new_output_tick = time.NewTicker(state.NewOutputEvery)
+
+				for _, sink := range sinks {
+					sink.OpenFileRequest <- true
+				}
+
+				resp <- true
+			}
+
+		case resp := <-state.StopRequest:
+			if state.Recording {
+				// Stop recording
+				state.Recording = false
+
+				new_output_tick.Stop()
+
+				for _, sink := range sinks {
+					sink.StopRequest <- true
+				}
+
+				resp <- true
+			} else {
+				// Already stopped
+				resp <- false
+			}
+
+		case resp := <-state.StatusRequest:
+			st := StatusMessage{
+				Hostname:          state.Hostname,
+				Recording:         state.Recording,
+				RecordingDuration: 0,
+			}
+
+			if state.Recording {
+				st.RecordingDuration = time.Since(state.RecordingStart).Seconds()
+			}
+
+			for _, sink := range sinks {
+				st.Sinks = append(st.Sinks, sink.Name)
+			}
+
+			resp <- &st
+
 		case ev := <-heartbeat.Events:
 			switch ev.Event {
 			case HEARTBEAT_ONLINE:
@@ -93,28 +150,43 @@ func RunMain() {
 
 				key := ev.Dst.String()
 
-				sink := MakeSink()
-
-				mysink := &MySink{
-					Sink:  sink,
-					Namer: MakeFilenameMaker(state, key),
+				name, ok := state.Multicast2Name[key]
+				if !ok {
+					name = key
 				}
 
-				sink.OpenFile <- mysink.Namer
+				sink := MakeSink(name, MakeFilenameMaker(state, name))
+
 				source.AddSink(ev.Dst, sink)
 
-				sinks[key] = mysink
+				sinks[key] = sink
+
+				if state.Recording {
+					sink.OpenFileRequest <- true
+				}
 
 			case HEARTBEAT_OFFLINE:
 				log.Printf("OFFLINE %s => %s", ev.Src, ev.Dst)
 				source.leaveGroup <- ev.Dst
 
-				delete(sinks, ev.Dst.String())
+				key := ev.Dst.String()
+				if sink, ok := sinks[key]; ok {
+					sink.StopRequest <- true
+					sink.OfflineRequest <- true
+				}
+
+				source.RemoveSink(ev.Dst)
+
+				delete(sinks, key)
 			}
 
 		case <-new_output_tick.C:
-			for _, mysink := range sinks {
-				mysink.Sink.OpenFile <- mysink.Namer
+			if !state.Recording {
+				continue
+			}
+
+			for _, sink := range sinks {
+				sink.OpenFileRequest <- true
 			}
 		}
 	}

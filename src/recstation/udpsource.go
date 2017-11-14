@@ -41,12 +41,13 @@ type UdpSource struct {
 
 	SinkMap map[uint32]*Sink
 
-	ListenError  chan error
-	RxBufReady   chan *RecvBuf
-	RxBufPending chan *RecvBuf
-	RecvPackets  chan *RecvPacket
-	leaveGroup   chan net.IP
-	addSink      chan addSinkMsg
+	ListenError       chan error
+	RxBufReady        chan *RecvBuf
+	RxBufPending      chan *RecvBuf
+	RecvPackets       chan *RecvPacket
+	leaveGroup        chan net.IP
+	addSink           chan addSinkMsg
+	removeSinkRequest chan net.IP
 }
 
 type addSinkMsg struct {
@@ -59,6 +60,10 @@ func (source *UdpSource) AddSink(group net.IP, sink *Sink) {
 		Group: group,
 		Sink:  sink,
 	}
+}
+
+func (source *UdpSource) RemoveSink(group net.IP) {
+	source.removeSinkRequest <- group
 }
 
 func MakeUdpSource(iface *net.Interface, listenAddr string) (*UdpSource, error) {
@@ -118,6 +123,12 @@ func (source *UdpSource) RunLoop() {
 			key := IPtoU32(msg.Group)
 			source.SinkMap[key] = msg.Sink
 
+		case addr := <-source.removeSinkRequest:
+			log.Printf("Removing sink for %s", addr)
+
+			key := IPtoU32(addr)
+			delete(source.SinkMap, key)
+
 		case group := <-source.leaveGroup:
 			if err := source.PktConn.LeaveGroup(source.Iface, &net.UDPAddr{IP: group}); err != nil {
 				panic(err)
@@ -151,7 +162,6 @@ func (source *UdpSource) RunLoop() {
 
 			rx.Stop = false
 			source.RxBufReady <- rx
-
 		}
 	}
 }
