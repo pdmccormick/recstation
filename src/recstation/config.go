@@ -16,6 +16,9 @@ type ConfigJson struct {
 	HeartbeatListen     string            `json:"heartbeat_listen"`
 	HeartbeatTimeoutDur string            `json:"heartbeat_timeout"`
 	HttpListen          string            `json:"http_listen"`
+	AlsaDevice          string            `json:"alsa_device"`
+	AlsaNumChannels     int               `json:"alsa_num_channels"`
+	AlsaBitrate         int               `json:"alsa_bitrate"`
 }
 
 func (cfg *ConfigJson) DecodeJson(r io.Reader) error {

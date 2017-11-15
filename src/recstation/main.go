@@ -84,7 +84,14 @@ func RunMain() {
 		panic(err)
 	}
 
+	//func MakeAudioSource(device string, num_channels, bitrate int) *AudioSource {
+	audio := MakeAudioSource(state.AlsaDevice, state.AlsaNumChannels, state.AlsaBitrate)
+	log.Printf("Audio device %s", audio.Device)
+
 	sinks := make(map[string]*Sink)
+
+	audio.Sink = MakeSink("audio", MakeFilenameMaker(state, "audio"))
+	sinks["audio"] = audio.Sink
 
 	new_output_tick := time.NewTicker(state.NewOutputEvery)
 	new_output_tick.Stop()

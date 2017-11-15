@@ -26,6 +26,12 @@ type Sink struct {
 	OfflineRequest  chan bool
 	OpenFileRequest chan bool
 	Packets         chan []mpeg.TsBuffer
+	rawWrites       chan sinkRawWrite
+}
+
+type sinkRawWrite struct {
+	Buf  []byte
+	Done chan bool
 }
 
 func MakeSink(name string, namer func(start bool) string) *Sink {
@@ -36,11 +42,19 @@ func MakeSink(name string, namer func(start bool) string) *Sink {
 		OfflineRequest:  make(chan bool),
 		OpenFileRequest: make(chan bool),
 		Packets:         make(chan []mpeg.TsBuffer),
+		rawWrites:       make(chan sinkRawWrite),
 	}
 
 	go sink.Runloop()
 
 	return sink
+}
+
+func (sink *Sink) RawWrite(buf []byte, done chan bool) {
+	sink.rawWrites <- sinkRawWrite{
+		Buf:  buf,
+		Done: done,
+	}
 }
 
 func ensureExists(path string) error {
@@ -126,6 +140,17 @@ func (sink *Sink) Runloop() {
 			}
 
 			sink.Running = ok
+
+		case msg := <-sink.rawWrites:
+			if sink.Running && sink.File != nil {
+				n, err := sink.File.Write(msg.Buf)
+				if err != nil {
+					log.Printf("Error raw writing to sink (%d bytes): %s", n, err)
+					sink.closeFile()
+				}
+			}
+
+			msg.Done <- true
 
 		case pkts := <-sink.Packets:
 			if !sink.Running {
