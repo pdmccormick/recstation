@@ -1,0 +1,44 @@
+body {
+  padding-top: 5rem;
+}
+
+.starter-template {
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.hostname {
+    font-size: 125%;
+    font-weight: bold;
+}
+
+.transport-record {
+    color: #000;
+}
+
+.transport-record-flash {
+    background-color: red;
+    color: #fff;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.5);
+}
+
+.transport-counter {
+    border-radius: 5px;
+    background-color: #fff;
+    color: #000;
+    line-height: 1.5em;
+    padding: 0 10px 0 10px;
+    margin-left: 5px;
+    font-size: 18pt;
+    font-weight: bold;
+    text-align: center;
+    font-family: monospace;
+}
+
+.hostname-container {
+    display: none;
+}
+
+.hostname {
+    font-family: monospace;
+}
