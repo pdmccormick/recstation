@@ -176,13 +176,12 @@ func RunMain() {
 				log.Printf("OFFLINE %s => %s", ev.Src, ev.Dst)
 				source.leaveGroup <- ev.Dst
 
+				source.RemoveSink(ev.Dst)
+
 				key := ev.Dst.String()
 				if sink, ok := sinks[key]; ok {
-					sink.StopRequest <- true
 					sink.OfflineRequest <- true
 				}
-
-				source.RemoveSink(ev.Dst)
 
 				delete(sinks, key)
 			}

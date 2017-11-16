@@ -89,7 +89,7 @@ func (sink *Sink) openFile(filename string) (bool, error) {
 		return false, nil
 	}
 
-	log.Printf("Opening %s", filename)
+	log.Printf("Opening %s file %s", sink.Name, filename)
 
 	dirname := path.Dir(filename)
 	if err := ensureExists(dirname); err != nil {

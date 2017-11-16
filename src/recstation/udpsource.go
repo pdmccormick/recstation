@@ -68,13 +68,14 @@ func (source *UdpSource) RemoveSink(group net.IP) {
 
 func MakeUdpSource(iface *net.Interface, listenAddr string) (*UdpSource, error) {
 	source := &UdpSource{
-		Iface:        iface,
-		ListenError:  make(chan error),
-		RxBufReady:   make(chan *RecvBuf, NUM_INFLIGHT_PACKETS),
-		RxBufPending: make(chan *RecvBuf, NUM_INFLIGHT_PACKETS),
-		leaveGroup:   make(chan net.IP),
-		addSink:      make(chan addSinkMsg),
-		SinkMap:      make(map[uint32]*Sink),
+		Iface:             iface,
+		ListenError:       make(chan error),
+		RxBufReady:        make(chan *RecvBuf, NUM_INFLIGHT_PACKETS),
+		RxBufPending:      make(chan *RecvBuf, NUM_INFLIGHT_PACKETS),
+		leaveGroup:        make(chan net.IP),
+		addSink:           make(chan addSinkMsg),
+		removeSinkRequest: make(chan net.IP),
+		SinkMap:           make(map[uint32]*Sink),
 	}
 
 	laddr, err := net.ResolveUDPAddr("udp4", listenAddr)
