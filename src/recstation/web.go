@@ -98,11 +98,40 @@ func serveStop(state *State) func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func servePreview(state *State) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+
+		sink := q.Get("sink")
+		nextVal := q.Get("next")
+
+		ch := make(chan error)
+
+		corsHeaders(w)
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-control", "private, max-age=0, no-cache")
+
+		req := PreviewMessage{
+			Sink:   sink,
+			Next:   (nextVal == "1"),
+			Writer: w,
+			Ready:  ch,
+		}
+
+		state.PreviewRequest <- req
+		err := <-ch
+		if err != nil {
+			log.Printf("Preview error: %s", err)
+		}
+	}
+}
+
 func StartWeb(state *State, addr string) error {
 	http.HandleFunc("/", serveRoot)
 	http.HandleFunc("/api/v1/status", serveStatus(state))
 	http.HandleFunc("/api/v1/record", serveRecord(state))
 	http.HandleFunc("/api/v1/stop", serveStop(state))
+	http.HandleFunc("/api/v1/preview", servePreview(state))
 
 	go func() {
 		err := http.ListenAndServe(addr, nil)

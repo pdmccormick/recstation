@@ -22,6 +22,8 @@ type Sink struct {
 	Filename string
 	Namer    func(start bool) string
 
+	Preview *Preview
+
 	StopRequest     chan bool
 	OfflineRequest  chan bool
 	OpenFileRequest chan bool
@@ -153,10 +155,6 @@ func (sink *Sink) Runloop() {
 			msg.Done <- true
 
 		case pkts := <-sink.Packets:
-			if !sink.Running {
-				continue
-			}
-
 			npkts := len(pkts)
 			nbytes := 0
 			for i, pkt := range pkts {
@@ -186,7 +184,7 @@ func (sink *Sink) Runloop() {
 				}
 			}
 
-			if sink.File == nil {
+			if !sink.Running || sink.File == nil {
 				continue
 			}
 

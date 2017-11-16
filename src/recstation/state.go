@@ -1,6 +1,7 @@
 package recstation
 
 import (
+	"io"
 	"net"
 	"os"
 	"time"
@@ -24,8 +25,10 @@ type State struct {
 	StatusRequest    chan chan *StatusMessage
 	RecordRequest    chan chan bool
 	StopRequest      chan chan bool
-	Recording        bool
-	RecordingStart   time.Time
+	PreviewRequest   chan PreviewMessage
+
+	Recording      bool
+	RecordingStart time.Time
 }
 
 type StatusMessage struct {
@@ -33,6 +36,13 @@ type StatusMessage struct {
 	Recording         bool     `json:"recording"`
 	RecordingDuration float64  `json:"recording_duration"`
 	Sinks             []string `json:"sinks"`
+}
+
+type PreviewMessage struct {
+	Sink   string
+	Writer io.Writer
+	Next   bool
+	Ready  chan error
 }
 
 func MakeState(cfg ConfigJson) (*State, error) {
@@ -65,6 +75,7 @@ func MakeState(cfg ConfigJson) (*State, error) {
 		StatusRequest:    make(chan chan *StatusMessage),
 		RecordRequest:    make(chan chan bool),
 		StopRequest:      make(chan chan bool),
+		PreviewRequest:   make(chan PreviewMessage),
 	}
 
 	for multicast, name := range state.Multicast2Name {

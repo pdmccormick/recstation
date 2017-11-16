@@ -150,11 +150,26 @@ func RunMain() {
 
 			resp <- &st
 
+		case req := <-state.PreviewRequest:
+			if sink, ok := sinks[req.Sink]; ok {
+				p := sink.Preview
+
+				if p != nil {
+					p.JpegRequest <- PreviewJpegRequest{
+						Next:   req.Next,
+						Writer: req.Writer,
+						Ready:  req.Ready,
+					}
+
+					continue
+				}
+			}
+
+			req.Ready <- nil
+
 		case ev := <-heartbeat.Events:
 			switch ev.Event {
 			case HEARTBEAT_ONLINE:
-				log.Printf("Online %s => %s", ev.Src, ev.Dst)
-
 				key := ev.Dst.String()
 
 				name, ok := state.Multicast2Name[key]
@@ -162,11 +177,15 @@ func RunMain() {
 					name = key
 				}
 
+				log.Printf("Online %s => %s (%s)", ev.Src, ev.Dst, name)
+
 				sink := MakeSink(name, MakeFilenameMaker(state, name))
+
+				sink.Preview = MakePreview(state.PreviewFramerate, state.PreviewWidth, state.PreviewHeight)
 
 				source.AddSink(ev.Dst, sink)
 
-				sinks[key] = sink
+				sinks[name] = sink
 
 				if state.Recording {
 					sink.OpenFileRequest <- true
@@ -179,11 +198,17 @@ func RunMain() {
 				source.RemoveSink(ev.Dst)
 
 				key := ev.Dst.String()
-				if sink, ok := sinks[key]; ok {
+
+				name, ok := state.Multicast2Name[key]
+				if !ok {
+					name = key
+				}
+
+				if sink, ok := sinks[name]; ok {
 					sink.OfflineRequest <- true
 				}
 
-				delete(sinks, key)
+				delete(sinks, name)
 			}
 
 		case <-new_output_tick.C:

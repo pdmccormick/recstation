@@ -19,6 +19,10 @@ type ConfigJson struct {
 	AlsaDevice          string            `json:"alsa_device"`
 	AlsaNumChannels     int               `json:"alsa_num_channels"`
 	AlsaBitrate         int               `json:"alsa_bitrate"`
+
+	PreviewFramerate int `json:"preview_framerate"`
+	PreviewWidth     int `json:"preview_width"`
+	PreviewHeight    int `json:"preview_height"`
 }
 
 func (cfg *ConfigJson) DecodeJson(r io.Reader) error {

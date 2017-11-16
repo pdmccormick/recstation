@@ -6,6 +6,7 @@ import (
 
 	"mpeg"
 
+	"github.com/google/vectorio"
 	"golang.org/x/net/ipv4"
 )
 
@@ -158,6 +159,31 @@ func (source *UdpSource) RunLoop() {
 				if sink, found := source.SinkMap[key]; found {
 					//log.Printf("%s => %s: n=%d", rp.Src, rp.Dst, len(rp.Pkts))
 					sink.Packets <- rx.Pkts
+
+					if sink.Preview != nil && sink.Preview.Input != nil {
+						var multiple [10][]byte
+
+						npkts := len(rx.Pkts)
+						nbytes := 0
+						for i, pkt := range rx.Pkts {
+							multiple[i] = pkt[:mpeg.TS_PACKET_LENGTH]
+							nbytes += len(multiple[i])
+
+							if multiple[i][0] != 'G' {
+								log.Printf("bad TS preview")
+							}
+						}
+
+						n, err := vectorio.Writev(sink.Preview.Input, multiple[:npkts])
+						if err != nil {
+							log.Printf("Failed to write into preview (%d bytes): %s", n, err)
+							sink.Preview.Input = nil
+						}
+
+						if n != nbytes {
+							log.Printf("Bad number of preview bytes: %d vs %d", n, nbytes)
+						}
+					}
 				}
 			}
 
