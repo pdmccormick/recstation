@@ -125,6 +125,25 @@
         });
     }
 
+    function setupPreview(elem, name) {
+        var img_url = BASE_URL + '/preview?sink=' + name;
+        var next_url = BASE_URL + '/preview?sink=' + name + '&next=1';
+
+        function update() {
+            elem.attr('src', img_url + '&_=' + new Date().getTime());
+        }
+
+        elem.on('load', function() {
+            console.log('load', name);
+
+            $.get(next_url, function() {
+                update();
+            });
+        });
+
+        update();
+    }
+
     function createSink(name) {
         if (name == 'audio') {
             return;
@@ -142,20 +161,8 @@
         $("#sink-info").append(elem);
 
         var img = elem.find('img');
-        console.log(img);
 
-        var i = 0;
-
-        img.on('load', function() {
-            console.log("load", name);
-
-             setTimeout(function() {
-                img.attr('src', img_url + '&_=' + i);
-                i += 1;
-            }, 450);
-        });
-
-        img.attr('src', img_url);
+        setupPreview(img, name);
     }
 
     $(function() {

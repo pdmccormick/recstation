@@ -110,8 +110,6 @@ func servePreview(state *State) func(w http.ResponseWriter, r *http.Request) {
 		ch := make(chan error)
 
 		corsHeaders(w)
-		w.Header().Set("Content-Type", "image/jpeg")
-		w.Header().Set("Cache-control", "private, max-age=0, no-cache")
 
 		req := PreviewMessage{
 			Sink:   sink,
@@ -120,10 +118,29 @@ func servePreview(state *State) func(w http.ResponseWriter, r *http.Request) {
 			Ready:  ch,
 		}
 
-		state.PreviewRequest <- req
-		err := <-ch
-		if err != nil {
-			log.Printf("Preview error: %s", err)
+		if req.Next {
+			state.PreviewRequest <- req
+			<-ch
+
+			var resp struct {
+				Success bool `json:"success"`
+			}
+			resp.Success = true
+
+			enc := json.NewEncoder(w)
+			if err := enc.Encode(resp); err != nil {
+				log.Print("Preview:", err)
+			}
+		} else {
+			w.Header().Set("Content-Type", "image/jpeg")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Pragma", "no-cache")
+
+			state.PreviewRequest <- req
+			err := <-ch
+			if err != nil {
+				log.Printf("Preview error: %s", err)
+			}
 		}
 	}
 }

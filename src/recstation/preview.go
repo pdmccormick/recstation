@@ -110,11 +110,7 @@ func (p *Preview) RunLoop() {
 
 			if len(p.NextPreviews) > 0 {
 				for _, req := range p.NextPreviews {
-					err := jpeg.Encode(req.Writer, p.Image, nil)
-
-					go func(err error, ch chan error) {
-						ch <- err
-					}(err, req.Ready)
+					req.Ready <- nil
 				}
 
 				p.NextPreviews = []PreviewJpegRequest{}
