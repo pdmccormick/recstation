@@ -81,6 +81,14 @@ func (sink *Sink) closeFile() bool {
 
 	sink.File.Close()
 	sink.File = nil
+
+	fi, err := os.Stat(sink.Filename)
+	if err == nil {
+		if fi.Size() == 0 {
+			os.Remove(sink.Filename)
+		}
+	}
+
 	sink.Filename = ""
 
 	return true

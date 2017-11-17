@@ -19,6 +19,11 @@ const (
 	ENCODE_PROG  = "ffmpeg"
 )
 
+const (
+	AUDIO_EVENT_STARTUP  = 1
+	AUDIO_EVENT_SHUTDOWN = 2
+)
+
 type AudioSource struct {
 	Device      string
 	NumChannels int
@@ -32,6 +37,7 @@ type AudioSource struct {
 
 	RecvPacket chan AudioRecvPacket
 	Exits      chan CmdExit
+	Event      chan int
 
 	Sink *Sink
 }
@@ -65,6 +71,7 @@ func MakeAudioSource(device string, num_channels, bitrate int) *AudioSource {
 			"-b:a", "2048k",
 			"-",
 		},
+		Event: make(chan int),
 	}
 
 	go source.RunLoop()
@@ -106,6 +113,8 @@ func (source *AudioSource) RunLoop() {
 				log.Printf("Starting audio capture")
 				source.start()
 				active = true
+
+				source.Event <- AUDIO_EVENT_STARTUP
 			}
 
 		case exit := <-source.Exits:
@@ -124,6 +133,7 @@ func (source *AudioSource) RunLoop() {
 
 			active = false
 			source.shutdown()
+			source.Event <- AUDIO_EVENT_SHUTDOWN
 
 			time.AfterFunc(BACKOFF_PERIOD, func() {
 				startup <- true
@@ -190,7 +200,7 @@ func (source *AudioSource) shutdown() {
 		pkt := <-recv
 
 		if pkt.Err != nil {
-			log.Printf("Receive loop shutdown with error: %s", pkt.Err)
+			//log.Printf("Receive loop shutdown with error: %s", pkt.Err)
 			return
 		}
 

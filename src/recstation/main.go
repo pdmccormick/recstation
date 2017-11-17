@@ -91,13 +91,26 @@ func RunMain() {
 	sinks := make(map[string]*Sink)
 
 	audio.Sink = MakeSink("audio", MakeFilenameMaker(state, "audio"))
-	sinks["audio"] = audio.Sink
 
 	new_output_tick := time.NewTicker(state.NewOutputEvery)
 	new_output_tick.Stop()
 
 	for {
 		select {
+		case ev := <-audio.Event:
+			switch ev {
+			case AUDIO_EVENT_STARTUP:
+				sinks["audio"] = audio.Sink
+
+				if state.Recording {
+					audio.Sink.OpenFileRequest <- true
+				}
+
+			case AUDIO_EVENT_SHUTDOWN:
+				audio.Sink.StopRequest <- true
+				delete(sinks, "audio")
+			}
+
 		case resp := <-state.RecordRequest:
 			if state.Recording {
 				// Already recording
