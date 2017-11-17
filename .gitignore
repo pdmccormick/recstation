@@ -1,3 +1,5 @@
 pkg/
 
 ./recstation$
+
+src/recstation/bindata.go

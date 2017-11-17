@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/elazarl/go-bindata-assetfs"
 )
 
 func corsHeaders(w http.ResponseWriter) {
@@ -127,11 +129,18 @@ func servePreview(state *State) func(w http.ResponseWriter, r *http.Request) {
 }
 
 func StartWeb(state *State, addr string) error {
-	http.HandleFunc("/", serveRoot)
 	http.HandleFunc("/api/v1/status", serveStatus(state))
 	http.HandleFunc("/api/v1/record", serveRecord(state))
 	http.HandleFunc("/api/v1/stop", serveStop(state))
 	http.HandleFunc("/api/v1/preview", servePreview(state))
+
+	http.Handle("/", http.FileServer(
+		&assetfs.AssetFS{
+			Asset:     Asset,
+			AssetDir:  AssetDir,
+			AssetInfo: AssetInfo,
+			Prefix:    "",
+		}))
 
 	go func() {
 		err := http.ListenAndServe(addr, nil)

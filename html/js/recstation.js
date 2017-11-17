@@ -152,7 +152,7 @@
              setTimeout(function() {
                 img.attr('src', img_url + '&_=' + i);
                 i += 1;
-            }, 750);
+            }, 450);
         });
 
         img.attr('src', img_url);
