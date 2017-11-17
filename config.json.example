@@ -1,7 +1,8 @@
 {
     "iface": "eth0",
+    "http_listen": "0.0.0.0:8000",
 
-    "output_filename": "/video/pyconca/{{year}}/{{year}}-{{month}}-{{day}}/{{hostname}}/{{hostname}},{{stream}},{{timestamp}},{{start}}.ts",
+    "output_filename": "/video/pyconca/{{year}}/{{year}}-{{month}}-{{day}}/{{hostname}}/{{hostname}},{{stream}},{{timestamp}},{{start}}.mpg",
     "output_timestamp": "2006-01-02,150405.000000-0700",
     "new_output_every": "1m",
 
@@ -18,5 +19,13 @@
         "239.255.47.47": "halifax",
         "239.255.48.48": "winnipeg",
         "239.255.49.49": "stjohns"
-    }
+    },
+
+    "alsa_device": "hw:CARD=ZEDi10,DEV=0",
+    "alsa_num_channels": 4,
+    "alsa_bitrate": 48000,
+
+    "preview_framerate": 3,
+    "preview_width": 960,
+    "preview_height": 540
 }

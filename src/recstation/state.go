@@ -32,10 +32,10 @@ type State struct {
 }
 
 type StatusMessage struct {
-	Hostname          string   `json:"hostname"`
-	Recording         bool     `json:"recording"`
-	RecordingDuration float64  `json:"recording_duration"`
-	Sinks             []string `json:"sinks"`
+	Hostname          string               `json:"hostname"`
+	Recording         bool                 `json:"recording"`
+	RecordingDuration float64              `json:"recording_duration"`
+	Sinks             []*SinkStatusMessage `json:"sinks"`
 }
 
 type PreviewMessage struct {

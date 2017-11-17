@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -157,9 +158,16 @@ func RunMain() {
 				st.RecordingDuration = time.Since(state.RecordingStart).Seconds()
 			}
 
+			collect := make(chan *SinkStatusMessage)
+
 			for _, sink := range sinks {
-				st.Sinks = append(st.Sinks, sink.Name)
+				sink.StatusRequest <- collect
+				msg := <-collect
+
+				st.Sinks = append(st.Sinks, msg)
 			}
+
+			sort.Sort(SinkStatusMessage_ByName(st.Sinks))
 
 			resp <- &st
 

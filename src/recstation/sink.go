@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	"mpeg"
 
@@ -29,7 +30,23 @@ type Sink struct {
 	OpenFileRequest chan bool
 	Packets         chan []mpeg.TsBuffer
 	rawWrites       chan sinkRawWrite
+	StatusRequest   chan chan *SinkStatusMessage
 }
+
+type SinkStatusMessage struct {
+	Name              string `json:"name"`
+	Running           bool   `json:"running"`
+	BytesIn           uint64 `json:"bytes_in"`
+	BytesInPerSecond  uint64 `json:"bytes_in_per_second"`
+	BytesOut          uint64 `json:"bytes_out"`
+	BytesOutPerSecond uint64 `json:"bytes_out_per_second"`
+}
+
+type SinkStatusMessage_ByName []*SinkStatusMessage
+
+func (a SinkStatusMessage_ByName) Len() int           { return len(a) }
+func (a SinkStatusMessage_ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SinkStatusMessage_ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 type sinkRawWrite struct {
 	Buf  []byte
@@ -45,6 +62,7 @@ func MakeSink(name string, namer func(start bool) string) *Sink {
 		OpenFileRequest: make(chan bool),
 		Packets:         make(chan []mpeg.TsBuffer),
 		rawWrites:       make(chan sinkRawWrite),
+		StatusRequest:   make(chan chan *SinkStatusMessage),
 	}
 
 	go sink.Runloop()
@@ -123,12 +141,25 @@ func (sink *Sink) Runloop() {
 	online := true
 	multiple := make([][]byte, 10)
 
+	bytes_in := uint64(0)
+	last_bytes_in := uint64(0)
+	bytes_in_per := uint64(0)
+
+	bytes_out := uint64(0)
+	last_bytes_out := uint64(0)
+	bytes_out_per := uint64(0)
+
+	ticker := time.NewTicker(1 * time.Second)
+
 	for online {
 		select {
 		case <-sink.StopRequest:
 			sink.closeFile()
 
 			sink.Running = false
+			bytes_out = 0
+			last_bytes_out = 0
+			bytes_out_per = 0
 
 		case <-sink.OfflineRequest:
 			log.Printf("Sink '%s' going offline", sink.Name)
@@ -136,6 +167,13 @@ func (sink *Sink) Runloop() {
 			sink.closeFile()
 
 			sink.Running = false
+			bytes_out = 0
+			last_bytes_out = 0
+			bytes_out_per = 0
+
+			bytes_in = 0
+			last_bytes_in = 0
+			bytes_in_per = 0
 
 			online = false
 
@@ -152,11 +190,16 @@ func (sink *Sink) Runloop() {
 			sink.Running = ok
 
 		case msg := <-sink.rawWrites:
+			bytes_in += uint64(len(msg.Buf))
+
 			if sink.Running && sink.File != nil {
 				n, err := sink.File.Write(msg.Buf)
+
 				if err != nil {
 					log.Printf("Error raw writing to sink (%d bytes): %s", n, err)
 					sink.closeFile()
+				} else {
+					bytes_out += uint64(n)
 				}
 			}
 
@@ -192,6 +235,8 @@ func (sink *Sink) Runloop() {
 				}
 			}
 
+			bytes_in += uint64(nbytes)
+
 			if !sink.Running || sink.File == nil {
 				continue
 			}
@@ -204,6 +249,25 @@ func (sink *Sink) Runloop() {
 			if n != nbytes {
 				log.Printf("nbytes=%d n=%d", nbytes, n)
 			}
+
+			bytes_out += uint64(n)
+
+		case resp := <-sink.StatusRequest:
+			resp <- &SinkStatusMessage{
+				Name:              sink.Name,
+				Running:           sink.Running,
+				BytesIn:           bytes_in,
+				BytesInPerSecond:  bytes_in_per,
+				BytesOut:          bytes_out,
+				BytesOutPerSecond: bytes_out_per,
+			}
+
+		case <-ticker.C:
+			bytes_in_per = bytes_in - last_bytes_in
+			last_bytes_in = bytes_in
+
+			bytes_out_per = bytes_out - last_bytes_out
+			last_bytes_out = bytes_out
 		}
 	}
 

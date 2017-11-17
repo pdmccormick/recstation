@@ -1,9 +1,9 @@
 body {
-  padding-top: 5rem;
+  padding-top: 3rem;
 }
 
-.starter-template {
-  padding: 3rem 1.5rem;
+.main {
+  padding: 0.5em;
   text-align: center;
 }
 
@@ -41,4 +41,27 @@ body {
 
 .hostname {
     font-family: monospace;
+}
+
+.sink-info {
+    width: 95%;
+    margin: auto;
+}
+
+.sink-status {
+    display: inline-block;
+    width: 40%;
+    padding: 1em;
+    margin: 1em;
+    border: 1px solid #ddd;
+}
+
+.sink-name {
+    font-size: 16pt;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.sink-preview-img {
+    width: 100%;
 }

@@ -110,19 +110,39 @@
             }
 
             var i
-            for (i = 0; i < data.sinks.length; i++) {
+            for (i = 0; data.sinks != null && i < data.sinks.length; i++) {
                 var s = data.sinks[i];
 
-                if (sinks[s] === undefined) {
+                if (sinks[s.name] === undefined) {
                     createSink(s);
-                } else {
                 }
+
+                updateSinkStatus(s);
             }
 
             if (data.hostname) {
                 setHostname(data.hostname);
             }
         });
+    }
+
+    function format_size(k) {
+        var KB = 1000;
+        var MB = 1000 * KB;
+        var GB = 1000 * MB;
+
+        if (k > GB) {
+            k = k / GB;
+            return k.toFixed(2) + ' GB';
+        } else if (k > MB) {
+            k = k / MB;
+            return k.toFixed(1) + ' MB';
+        } else if (k > KB) {
+            k = k / KB;
+            return k.toFixed(1) + ' KB';
+        } else {
+            return k + ' bytes';
+        }
     }
 
     function setupPreview(elem, name) {
@@ -134,8 +154,6 @@
         }
 
         elem.on('load', function() {
-            console.log('load', name);
-
             $.get(next_url, function() {
                 update();
             });
@@ -144,25 +162,50 @@
         update();
     }
 
-    function createSink(name) {
+    function createSink(sink) {
+        name = sink.name;
+
+        var html = `
+                <div class='sink-status sink-status-${name}' data-sink-name='${name}'>
+                    <div class='sink-name' id='sink-name-${name}'>${name}</div>
+                    <div class='sink-stats' id='sink-stats-${name}'>
+                        <span id='sink-stats-output-bw'></span> (<span id='sink-stats-output-total'></span> total)
+                    </div>
+                    <div class='sink-preview' id='sink-preview-${name}'>
+                        <img class='sink-preview-img' id='sink-preview-img-${name}' />
+                    </div>
+                </div>
+                `;
+
         if (name == 'audio') {
-            return;
+            html += "<div style='clear: both'></div>";
         }
 
-        var img_url = BASE_URL + "/preview?sink=" + name + "&next=1";
-        var elem = $("<div style='float: left; width: 50%' class='sink-" + name + "'><h3>" + name + "</h3> <img style='width: 100%' /></div>");
+        var elem = $(html);
 
-        var obj = {
+        var obj = sinks[name] = {
             elem: elem,
-        }
-
-        sinks[name] = obj
+        };
 
         $("#sink-info").append(elem);
 
-        var img = elem.find('img');
+        if (name != 'audio') {
+            var img = elem.find('img');
+            setupPreview(img, name);
+        } else {
+            elem.find('.sink-preview').hide();
+        }
+    }
 
-        setupPreview(img, name);
+    function updateSinkStatus(st)
+    {
+        var sink = sinks[st.name];
+        if (!sink) {
+            return;
+        }
+
+        sink.elem.find('#sink-stats-output-bw').text(format_size(st.bytes_in_per_second) + "/s");
+        sink.elem.find('#sink-stats-output-total').text(format_size(st.bytes_in));
     }
 
     $(function() {

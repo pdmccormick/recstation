@@ -80,10 +80,6 @@ func MakeAudioSource(device string, num_channels, bitrate int) *AudioSource {
 }
 
 func (source *AudioSource) RunLoop() {
-	bytes_in := 0
-	last_bytes_in := 0
-	bytes_in_per := 0
-
 	ticker := time.NewTicker(1 * time.Second)
 	ticker.Stop()
 
@@ -105,10 +101,6 @@ func (source *AudioSource) RunLoop() {
 			if !active {
 				ticker.Stop()
 				ticker = time.NewTicker(1 * time.Second)
-
-				bytes_in = 0
-				last_bytes_in = 0
-				bytes_in_per = 0
 
 				log.Printf("Starting audio capture")
 				source.start()
@@ -144,10 +136,6 @@ func (source *AudioSource) RunLoop() {
 				continue
 			}
 
-			if active {
-				bytes_in += len(pkt.Buf)
-			}
-
 			if source.Sink != nil {
 				n := len(pkt.Buf)
 				copy(buf[:n], pkt.Buf[:n])
@@ -156,12 +144,6 @@ func (source *AudioSource) RunLoop() {
 			}
 
 			pkt.KeepRunning <- true
-
-		case <-ticker.C:
-			bytes_in_per = bytes_in - last_bytes_in
-			last_bytes_in = bytes_in
-
-			log.Printf("read %d bytes of audio (%d total)", bytes_in_per, bytes_in)
 		}
 	}
 }
