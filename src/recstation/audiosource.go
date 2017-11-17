@@ -113,11 +113,17 @@ func (source *AudioSource) RunLoop() {
 			switch exit.Cmd {
 			case source.Capture:
 				log.Printf("Audio capture died with error: %v", exit.Err)
-				source.Encode.Process.Kill()
+				p := source.Encode.Process
+				if p != nil {
+					p.Kill()
+				}
 
 			case source.Encode:
 				log.Printf("Audio encoder died with error: %v", exit.Err)
-				source.Capture.Process.Kill()
+				p := source.Capture.Process
+				if p != nil {
+					p.Kill()
+				}
 
 			default:
 				continue
