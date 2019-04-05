@@ -1,26 +1,22 @@
-.PHONY: all clean
+.PHONY: all bin clean
 
-export PATH:=$(CURDIR)/bin:$(PATH)
-export GOPATH:=$(CURDIR)
-export GOBIN:=$(CURDIR)/bin
+export GOBIN:=$(shell go env GOPATH)/bin
 
-all: recstation
+all: bin bin/recstation
 
-recstation: cmd/recstation.go src/recstation/*.go src/mpeg/*.go bindata
-	go build $<
+bin:
+	mkdir -p bin
+
+bin/recstation: cmd/recstation.go *.go mpeg/*.go
+	go build -o $@ $<
 	sudo setcap cap_net_raw+eip $@
 	sudo setcap cap_net_admin+eip $@
 
-goget:
-	go get -u github.com/jteeuwen/go-bindata/...
-	@make bindata
-	go get recstation
-
 bindata:
-	go-bindata -pkg recstation -o src/recstation/bindata.go -prefix html html/ html/css/ html/js
+	$(GOBIN)/go-bindata -pkg recstation -o bindata.go -prefix html html/ html/css/ html/js
 
 test:
-	go test mpeg
+	go test
 
 clean:
-	rm -f ./recstation ./src/recstation/bindata.go
+	rm -rf ./bin/ ./bindata.go

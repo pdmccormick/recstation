@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 
-	"mpeg"
+	"recstation/mpeg"
 
 	"github.com/google/vectorio"
 	"golang.org/x/net/ipv4"

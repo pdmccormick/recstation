@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"mpeg"
+	"recstation/mpeg"
 )
 
 const (

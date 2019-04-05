@@ -153,10 +153,9 @@ func StartWeb(state *State, addr string) error {
 
 	http.Handle("/", http.FileServer(
 		&assetfs.AssetFS{
-			Asset:     Asset,
-			AssetDir:  AssetDir,
-			AssetInfo: AssetInfo,
-			Prefix:    "",
+			Asset:    Asset,
+			AssetDir: AssetDir,
+			Prefix:   "",
 		}))
 
 	go func() {

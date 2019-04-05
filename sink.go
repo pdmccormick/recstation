@@ -6,7 +6,7 @@ import (
 	"path"
 	"time"
 
-	"mpeg"
+	"recstation/mpeg"
 
 	"github.com/google/vectorio"
 )

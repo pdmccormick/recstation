@@ -1,7 +1,5 @@
 /bin/
-/pkg/
 
 /recstation
+/bindata.go
 /config.json
-
-src/recstation/bindata.go
